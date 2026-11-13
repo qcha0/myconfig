@@ -152,14 +152,15 @@ OpenWrt < 24.10 / firewall3 可以用 OpenClash 导入同一份 `mihomo/router.y
 
 ### 策略组（28 个）
 
-- 区域：`SG` / `JP` / `US` / `TW`（url-test），`US手选`，`US固定`
+- 区域：`SG` / `JP` / `US` / `TW`（url-test，tolerance 150 避免播放中途切节点），`US手选`，`US固定`
 - `AI-OpenAI` / `AI-Claude` / `AI-Gemini` / `AI-Grok`：默认 `US固定`，固定单节点保持出口 IP 稳定
 - 服务：Google、YouTube、Netflix、Spotify、Telegram、X、PayPal、Microsoft、Apple、Steam、Crypto、Media、Game
 - `CN`（默认 DIRECT）、`广告`、`漏网之鱼`
 
 ### 关键行为
 
-- `NETWORK,udp,DIRECT`：所有 UDP 直连，优先保证游戏稳定性；要代理 UDP（Discord 语音、国际服游戏）删掉这一行，并在 nikki 打开 UDP 代理
+- UDP 策略：`AND,((NETWORK,udp),(DST-PORT,443)),REJECT` 先拒绝 QUIC（UDP 443 在多数网络不可用，直连会让浏览器等数秒才回退 TCP），其余 UDP 由 `NETWORK,udp,DIRECT` 直连，优先保证游戏稳定性
+- 要代理 UDP（Discord 语音、国际服游戏）：删掉上面两行，并在 nikki 打开 UDP 代理
 - `Game` 组默认 `DIRECT`：游戏流量不经机场；需要加速时手动切 SG/JP
 - DNS：fake-IP + 银行/局域网域名排除（`fake-ip-filter`），国内 CDN 走就近 DNS（`nameserver-policy`）
 - 路由器 `log-level: silent`：核心不写连接日志，节省磁盘
@@ -199,6 +200,7 @@ git ls-files | grep -E 'router\.yaml|macos\.yaml|subscription\.url|local\.conf' 
 | 路由器上 CN 域名解析异常 | 检查 `install-china-list.sh` 是否执行、`confdir` 是否为 `/etc/dnsmasq.d` |
 | 代理不生效 | 关闭 flow offloading；确认 nikki TCP 模式为 TPROXY |
 | 游戏丢包 | 确认 nikki UDP 代理已关闭；`NETWORK,udp,DIRECT` 仍在规则里 |
+| YouTube / Spotify 卡顿 | 先确认 QUIC 已被 REJECT；再把对应策略组切到 SG（JP 节点实测最差）；带宽不足时手动选「高速专线-hy2」或美国下载节点 |
 | AI 服务 403 | 链路已通，节点 IP 被风控；在 `US固定` 里换节点 |
 | 想代理 UDP | 删除 `NETWORK,udp,DIRECT`，并在 nikki 打开 UDP 代理 |
 

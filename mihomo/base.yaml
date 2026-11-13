@@ -68,7 +68,7 @@ proxy-groups:
     exclude-filter: "(?i)(剩余|到期|重置|套餐|流量|客户端)"
     url: https://www.gstatic.com/generate_204
     interval: 600
-    tolerance: 50
+    tolerance: 150
     lazy: true
 
   - name: JP
@@ -78,7 +78,7 @@ proxy-groups:
     exclude-filter: "(?i)(剩余|到期|重置|套餐|流量|客户端)"
     url: https://www.gstatic.com/generate_204
     interval: 600
-    tolerance: 50
+    tolerance: 150
     lazy: true
 
   - name: US
@@ -88,7 +88,7 @@ proxy-groups:
     exclude-filter: "(?i)(剩余|到期|重置|套餐|流量|客户端)"
     url: https://www.gstatic.com/generate_204
     interval: 600
-    tolerance: 50
+    tolerance: 150
     lazy: true
 
   - name: TW
@@ -98,7 +98,7 @@ proxy-groups:
     exclude-filter: "(?i)(剩余|到期|重置|套餐|流量|客户端)"
     url: https://www.gstatic.com/generate_204
     interval: 600
-    tolerance: 50
+    tolerance: 150
     lazy: true
 
   # AI 固定出口：默认锁定一个"三网推荐"的美国节点，IP 稳定优先于延迟
@@ -134,13 +134,13 @@ proxy-groups:
     proxies: [SG, JP, US, 自动选择, DIRECT]
   - name: YouTube
     type: select
-    proxies: [JP, SG, US, 自动选择]
+    proxies: [SG, US, JP, 自动选择]
   - name: Netflix
     type: select
     proxies: [SG, JP, US, 自动选择]
   - name: Spotify
     type: select
-    proxies: [US, SG, JP, 自动选择]
+    proxies: [SG, US, JP, 自动选择]
   - name: Telegram
     type: select
     proxies: [SG, JP, US, 自动选择]
@@ -239,9 +239,12 @@ rules:
   - DOMAIN,hub5btmain.v6.shub.sandai.net,REJECT
   - IP-CIDR,180.76.76.200/32,REJECT,no-resolve
 
-  # ---- UDP 一律直连 ----
-  # 游戏 UDP 稳定性优先：即使路由器/客户端把 UDP 送进内核，也直接发往目标。
-  # 以后要代理 UDP（如 Discord 语音、国际服游戏），删掉这一行即可。
+  # ---- UDP 策略 ----
+  # QUIC（UDP 443）在国内网络通常不可用/被限速；直连会让浏览器等数秒再回退 TCP。
+  # 主动拒绝，让浏览器立刻走 TCP 代理；游戏用的非 443 UDP 仍然直连。
+  - AND,((NETWORK,udp),(DST-PORT,443)),REJECT
+  # 其余 UDP 一律直连：游戏稳定性优先。
+  # 以后要代理 UDP（如 Discord 语音、国际服游戏），删掉上面两行即可。
   - NETWORK,udp,DIRECT
 
   # ---- 连通性 / DNS 泄漏自检：强制走代理 ----
