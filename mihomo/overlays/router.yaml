@@ -1,0 +1,21 @@
+# =============================================================================
+# router.yaml overlay —— 只放 OpenWrt/nikki 需要的顶层键（base.yaml 里没有）
+# 与 base.yaml 无重复键，build-configs.sh 用 cat 合并，不需要 yq。
+# =============================================================================
+
+log-level: silent         # 路由器不写核心日志，省磁盘
+mixed-port: 7890            # LAN 设备可手动填 HTTP 代理，TPROXY 不依赖它
+allow-lan: true
+bind-address: '*'
+tproxy-port: 7893           # nikki 的 TPROXY 入口，需在 nikki 里选 TPROXY 模式
+
+# nikki 面板/API；只在 LAN 暴露，防火墙不要放行 WAN
+external-controller: 0.0.0.0:9090
+secret: "__API_SECRET__"
+
+# 路由器上拿不到转发流量的进程归属，保持关闭省 CPU
+find-process-mode: off
+
+# TUN 关闭：旁路由用 TPROXY，避免 auto-route 抢默认路由
+tun:
+  enable: false

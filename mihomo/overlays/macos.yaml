@@ -1,0 +1,24 @@
+# =============================================================================
+# macos.yaml overlay —— macOS / FlClash 端（base.yaml 里没有的顶层键）
+# 注意：FlClash 启动时会用自己的设置覆盖 log-level / find-process-mode /
+#       tun / 端口 / external-controller / allow-lan，本文件主要用于：
+#       1) 直接导入 FlClash 作为本地配置；2) 用 mihomo 裸核在 Mac 上验证。
+# =============================================================================
+
+log-level: silent
+mixed-port: 7890
+allow-lan: false
+bind-address: 127.0.0.1
+external-controller: 127.0.0.1:9090
+secret: ""
+
+# AI 规则里有 PROCESS-NAME（Claude / Codex / Antigravity），需要进程匹配
+find-process-mode: strict
+
+# TUN 默认关闭：先用系统代理验证；FlClash 里开 TUN 时会用自己的参数覆盖
+tun:
+  enable: false
+  stack: mixed
+  mtu: 1500
+  auto-detect-interface: true
+  dns-hijack: ['any:53']

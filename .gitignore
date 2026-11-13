@@ -1,0 +1,15 @@
+.DS_Store
+
+# 订阅地址与运行时秘密：本地保留，不提交
+mihomo/subscription.url
+mihomo/.secret
+
+# 由 scripts/build-configs.sh 生成（含订阅地址 / API secret）
+mihomo/router.yaml
+mihomo/macos.yaml
+mihomo/*.bak
+
+# 运行期缓存
+mihomo/providers/
+mihomo/rules/
+QuantumultX.local.conf

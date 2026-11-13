@@ -1,0 +1,460 @@
+# =============================================================================
+# base.yaml —— mihomo 共享基础配置（macOS FlClash + OpenWrt nikki 共用）
+# -----------------------------------------------------------------------------
+# 本文件只放"两端一致"的内容：节点来源、策略组、规则、DNS。
+# 设备相关项（mixed-port / allow-lan / external-controller / secret /
+# tproxy-port / tun / find-process-mode / log-level）在 overlays/ 下，用 scripts/build-configs.sh
+# 合并成 router.yaml 给 nikki；macOS 上直接把本文件导入 FlClash 即可，
+# 端口/TUN/API 由 FlClash 自己注入。
+#
+# 订阅地址等同于账号凭据，勿公开托管。
+# 规则源说明见文末注释。
+# =============================================================================
+
+mode: rule
+ipv6: false
+
+# 延迟与连接效率
+unified-delay: true          # 用同一口径计算延迟，避免 url-test 误判
+tcp-concurrent: true         # 多 IP 目标并发握手
+
+# geo 数据自动更新（GEOIP,CN 需要）
+geo-auto-update: true
+geo-update-interval: 24
+
+profile:
+  store-selected: false      # 与 FlClash 行为一致：选择不落盘，靠 default-selected
+
+# =============================================================================
+# 节点来源：机场订阅按 Clash UA 拉取（同一个 URL 对 QX UA 返回的是 QX 格式）
+# =============================================================================
+proxy-providers:
+  airport:
+    type: http
+    url: "__SUBSCRIPTION_URL__"
+    interval: 86400
+    path: ./providers/airport.yaml
+    header:
+      User-Agent: ["clash.meta"]
+    health-check:
+      enable: true
+      url: https://www.gstatic.com/generate_204
+      interval: 600
+    # 订阅里的流量/到期提示节点，不能参与测速
+    exclude-filter: "(?i)(剩余|到期|重置|套餐|流量|客户端|官网|客服|邀请|返利|广告|售后|过滤|失联|电报|Telegram|TG)"
+
+# =============================================================================
+# 策略组
+# =============================================================================
+proxy-groups:
+  - name: 节点选择
+    type: select
+    proxies: [自动选择, SG, JP, US, US固定, TW, DIRECT]
+
+  - name: 自动选择
+    type: url-test
+    use: [airport]
+    exclude-filter: "(?i)(剩余|到期|重置|套餐|流量|客户端|官网|客服|邀请|返利|广告|售后|过滤|失联|电报|Telegram|TG)"
+    url: https://www.gstatic.com/generate_204
+    interval: 600
+    tolerance: 80
+    lazy: true
+    icon: https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/Global.png
+
+  - name: SG
+    type: url-test
+    use: [airport]
+    filter: "(?i)(新加坡|🇸🇬)"
+    exclude-filter: "(?i)(剩余|到期|重置|套餐|流量|客户端)"
+    url: https://www.gstatic.com/generate_204
+    interval: 600
+    tolerance: 50
+    lazy: true
+
+  - name: JP
+    type: url-test
+    use: [airport]
+    filter: "(?i)(日本|🇯🇵)"
+    exclude-filter: "(?i)(剩余|到期|重置|套餐|流量|客户端)"
+    url: https://www.gstatic.com/generate_204
+    interval: 600
+    tolerance: 50
+    lazy: true
+
+  - name: US
+    type: url-test
+    use: [airport]
+    filter: "(?i)(美国|美國|🇺🇸)"
+    exclude-filter: "(?i)(剩余|到期|重置|套餐|流量|客户端)"
+    url: https://www.gstatic.com/generate_204
+    interval: 600
+    tolerance: 50
+    lazy: true
+
+  - name: TW
+    type: url-test
+    use: [airport]
+    filter: "(?i)(台湾|台灣|🇹🇼)"
+    exclude-filter: "(?i)(剩余|到期|重置|套餐|流量|客户端)"
+    url: https://www.gstatic.com/generate_204
+    interval: 600
+    tolerance: 50
+    lazy: true
+
+  # AI 固定出口：默认锁定一个"三网推荐"的美国节点，IP 稳定优先于延迟
+  - name: US固定
+    type: select
+    use: [airport]
+    filter: "(?i)(美国|美國|🇺🇸)"
+    exclude-filter: "(?i)(0\\.01倍|下载|剩余|到期|重置|套餐|流量|客户端)"
+    default-selected: '🇺🇸美国圣何塞01-0.1倍'
+
+  - name: US手选
+    type: select
+    use: [airport]
+    filter: "(?i)(美国|美國|🇺🇸)"
+    exclude-filter: "(?i)(剩余|到期|重置|套餐|流量|客户端)"
+
+  # ---- AI：按厂商分组，先于 Google / 媒体规则命中 ----
+  - name: AI-OpenAI          # ChatGPT / Codex / API
+    type: select
+    proxies: [US固定, US手选, US, 自动选择]
+  - name: AI-Claude          # Claude / Claude Code / MCP
+    type: select
+    proxies: [US固定, US手选, US, 自动选择]
+  - name: AI-Gemini          # Gemini / AI Studio / NotebookLM
+    type: select
+    proxies: [US固定, US手选, US, 自动选择]
+  - name: AI-Grok            # Grok / xAI
+    type: select
+    proxies: [US固定, US手选, US, 自动选择]
+
+  - name: Google
+    type: select
+    proxies: [SG, JP, US, 自动选择, DIRECT]
+  - name: YouTube
+    type: select
+    proxies: [JP, SG, US, 自动选择]
+  - name: Netflix
+    type: select
+    proxies: [SG, JP, US, 自动选择]
+  - name: Spotify
+    type: select
+    proxies: [US, SG, JP, 自动选择]
+  - name: Telegram
+    type: select
+    proxies: [SG, JP, US, 自动选择]
+  - name: X
+    type: select
+    proxies: [US, SG, JP, 自动选择]
+  - name: PayPal
+    type: select
+    proxies: [US, 自动选择, DIRECT]
+  - name: Microsoft
+    type: select
+    proxies: [SG, JP, US, 自动选择]
+  - name: Apple
+    type: select
+    proxies: [DIRECT, 自动选择, 节点选择]
+  - name: Steam
+    type: select
+    proxies: [SG, JP, US, 自动选择, DIRECT]
+  - name: Crypto
+    type: select
+    proxies: [US, SG, JP, 自动选择, DIRECT]
+  - name: Media
+    type: select
+    proxies: [SG, JP, US, 自动选择, DIRECT]
+  - name: Game
+    type: select
+    proxies: [DIRECT, SG, JP, US, 自动选择]
+  - name: CN
+    type: select
+    proxies: [DIRECT, 节点选择]
+  - name: 广告
+    type: select
+    proxies: [REJECT, DIRECT]
+  - name: 漏网之鱼
+    type: select
+    proxies: [节点选择, 自动选择, DIRECT]
+
+# =============================================================================
+# 规则源
+#   blackmatrix7：日常服务（带 IP 段的列表必须用 *_Classical* 版本，
+#                 否则只有域名部分；China/Apple/Netflix/GlobalMedia 属于这类）
+#   VPSDance/ai-proxy-rules：AI 按厂商拆分，每日自动同步
+#   AWAvenue：广告（behavior: domain，裸域名列表）
+# =============================================================================
+rule-providers:
+  ads: {type: http, behavior: domain, url: "https://raw.githubusercontent.com/TG-Twilight/AWAvenue-Ads-Rule/main/Filters/AWAvenue-Ads-Rule-Clash.yaml", path: ./rules/ads.yaml, interval: 86400}
+
+  ai-openai:    {type: http, behavior: classical, url: "https://raw.githubusercontent.com/VPSDance/ai-proxy-rules/main/rules/clash/openai.yaml", path: ./rules/ai-openai.yaml, interval: 86400}
+  ai-anthropic: {type: http, behavior: classical, url: "https://raw.githubusercontent.com/VPSDance/ai-proxy-rules/main/rules/clash/anthropic.yaml", path: ./rules/ai-anthropic.yaml, interval: 86400}
+  ai-gemini:    {type: http, behavior: classical, url: "https://raw.githubusercontent.com/VPSDance/ai-proxy-rules/main/rules/clash/google-ai.yaml", path: ./rules/ai-gemini.yaml, interval: 86400}
+  ai-xai:       {type: http, behavior: classical, url: "https://raw.githubusercontent.com/VPSDance/ai-proxy-rules/main/rules/clash/x-ai.yaml", path: ./rules/ai-xai.yaml, interval: 86400}
+
+  youtube:     {type: http, behavior: classical, url: "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/YouTube/YouTube.yaml", path: ./rules/youtube.yaml, interval: 86400}
+  netflix:     {type: http, behavior: classical, url: "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Netflix/Netflix_Classical_No_Resolve.yaml", path: ./rules/netflix.yaml, interval: 86400}
+  spotify:     {type: http, behavior: classical, url: "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Spotify/Spotify.yaml", path: ./rules/spotify.yaml, interval: 86400}
+  telegram:    {type: http, behavior: classical, url: "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Telegram/Telegram.yaml", path: ./rules/telegram.yaml, interval: 86400}
+  x:           {type: http, behavior: classical, url: "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Twitter/Twitter.yaml", path: ./rules/x.yaml, interval: 86400}
+  paypal:      {type: http, behavior: classical, url: "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/PayPal/PayPal.yaml", path: ./rules/paypal.yaml, interval: 86400}
+  google:      {type: http, behavior: classical, url: "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Google/Google.yaml", path: ./rules/google.yaml, interval: 86400}
+  microsoft:   {type: http, behavior: classical, url: "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Microsoft/Microsoft.yaml", path: ./rules/microsoft.yaml, interval: 86400}
+  onedrive:    {type: http, behavior: classical, url: "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/OneDrive/OneDrive.yaml", path: ./rules/onedrive.yaml, interval: 86400}
+  apple:       {type: http, behavior: classical, url: "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Apple/Apple_Classical_No_Resolve.yaml", path: ./rules/apple.yaml, interval: 86400}
+  steamcn:     {type: http, behavior: classical, url: "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/SteamCN/SteamCN.yaml", path: ./rules/steamcn.yaml, interval: 86400}
+  steam:       {type: http, behavior: classical, url: "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Steam/Steam.yaml", path: ./rules/steam.yaml, interval: 86400}
+  game:        {type: http, behavior: classical, url: "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Game/Game.yaml", path: ./rules/game.yaml, interval: 86400}
+  globalmedia: {type: http, behavior: classical, url: "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/GlobalMedia/GlobalMedia_Classical_No_Resolve.yaml", path: ./rules/globalmedia.yaml, interval: 86400}
+  binance:     {type: http, behavior: classical, url: "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Binance/Binance.yaml", path: ./rules/binance.yaml, interval: 86400}
+  okx:         {type: http, behavior: classical, url: "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/OKX/OKX.yaml", path: ./rules/okx.yaml, interval: 86400}
+  crypto:      {type: http, behavior: classical, url: "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Crypto/Crypto.yaml", path: ./rules/crypto.yaml, interval: 86400}
+  wechat:      {type: http, behavior: classical, url: "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/WeChat/WeChat.yaml", path: ./rules/wechat.yaml, interval: 86400}
+  bilibili:    {type: http, behavior: classical, url: "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/BiliBili/BiliBili.yaml", path: ./rules/bilibili.yaml, interval: 86400}
+  china:       {type: http, behavior: classical, url: "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/China/China_Classical_No_Resolve.yaml", path: ./rules/china.yaml, interval: 86400}
+
+# =============================================================================
+# 规则顺序：本地精确 → 广告 → AI → 具体服务 → 国内 → GEOIP → 兜底
+# =============================================================================
+rules:
+  # ---- 广告（本地补充） ----
+  - DOMAIN-SUFFIX,doubleclick.net,广告
+  - DOMAIN-SUFFIX,googlesyndication.com,广告
+  - DOMAIN-SUFFIX,googleadservices.com,广告
+  - DOMAIN-SUFFIX,google-analytics.com,广告
+  - DOMAIN-SUFFIX,app-measurement.com,广告
+  - DOMAIN-SUFFIX,scorecardresearch.com,广告
+  - DOMAIN-SUFFIX,adnxs.com,广告
+  - DOMAIN-SUFFIX,rubiconproject.com,广告
+  - DOMAIN-SUFFIX,pubmatic.com,广告
+  - DOMAIN-SUFFIX,openx.net,广告
+  - DOMAIN-SUFFIX,taboola.com,广告
+  - DOMAIN-SUFFIX,outbrain.com,广告
+  - RULE-SET,ads,广告
+
+  # ---- P2P / 版权探测 ----
+  - DOMAIN,hub5idx.v6.shub.sandai.net,REJECT
+  - DOMAIN,hub5emu.v6.shub.sandai.net,REJECT
+  - DOMAIN,hub5btmain.v6.shub.sandai.net,REJECT
+  - IP-CIDR,180.76.76.200/32,REJECT,no-resolve
+
+  # ---- UDP 一律直连 ----
+  # 游戏 UDP 稳定性优先：即使路由器/客户端把 UDP 送进内核，也直接发往目标。
+  # 以后要代理 UDP（如 Discord 语音、国际服游戏），删掉这一行即可。
+  - NETWORK,udp,DIRECT
+
+  # ---- 连通性 / DNS 泄漏自检：强制走代理 ----
+  - DOMAIN-SUFFIX,cc.cd,节点选择
+  - DOMAIN-SUFFIX,linux.do,节点选择
+  - DOMAIN-SUFFIX,invite.linuxdo.org,节点选择
+  - DOMAIN-KEYWORD,yattazen,节点选择
+  - DOMAIN-KEYWORD,mullvad,节点选择
+  - DOMAIN-KEYWORD,surfshark,节点选择
+  - DOMAIN-KEYWORD,expressvpn,节点选择
+  - DOMAIN-KEYWORD,ipleak,节点选择
+  - DOMAIN-KEYWORD,dnsleak,节点选择
+  - DOMAIN-KEYWORD,browserleaks,节点选择
+
+  # ---- App Store API 跟随 Apple 组；资源 CDN 直连 ----
+  - DOMAIN,apps.apple.com,Apple
+  - DOMAIN,amp-api.apps.apple.com,Apple
+  - DOMAIN,amp-api-search-edge.apps.apple.com,Apple
+  - DOMAIN,amp-api-updates.apps.apple.com,Apple
+  - DOMAIN,amp-api.media.apple.com,Apple
+  - DOMAIN,api-edge.apps.apple.com,Apple
+  - DOMAIN,api.apps.apple.com,Apple
+  - DOMAIN,bag.itunes.apple.com,Apple
+  - DOMAIN,client-api.itunes.apple.com,Apple
+  - DOMAIN,cma.itunes.apple.com,Apple
+  - DOMAIN,init.itunes.apple.com,Apple
+  - DOMAIN,iosapps-ssl.itunes.apple.com,Apple
+  - DOMAIN,iosapps.itunes.apple.com,Apple
+  - DOMAIN,itunes.apple.com,Apple
+  - DOMAIN,search.itunes.apple.com,Apple
+  - DOMAIN,se.itunes.apple.com,Apple
+  - DOMAIN,se-edge.itunes.apple.com,Apple
+  - DOMAIN,se2.itunes.apple.com,Apple
+  - DOMAIN,sf-api-token-service.itunes.apple.com,Apple
+  - DOMAIN,sp.itunes.apple.com,Apple
+  - DOMAIN,pd.itunes.apple.com,Apple
+  - DOMAIN,play.itunes.apple.com,Apple
+  - DOMAIN,uts-api.itunes.apple.com,Apple
+  - DOMAIN,buy.itunes.apple.com,Apple
+  - DOMAIN-SUFFIX,mzstatic.com,DIRECT
+
+  # ---- 游戏客户端直连 ----
+  - DOMAIN-SUFFIX,honorofkings.com,DIRECT
+  - DOMAIN-SUFFIX,wegameapi.com,DIRECT
+  - DOMAIN-SUFFIX,wegamex.com.hk,DIRECT
+
+  # ---- 银行直连（同时列入 fake-ip-filter） ----
+  - DOMAIN-SUFFIX,95599.cn,DIRECT
+  - DOMAIN-SUFFIX,abchina.com.cn,DIRECT
+  - DOMAIN-SUFFIX,bscabank.com,DIRECT
+  - DOMAIN-SUFFIX,openaboc.cn,DIRECT
+  - DOMAIN-SUFFIX,openaboc.com,DIRECT
+  - DOMAIN-SUFFIX,openaboc.com.cn,DIRECT
+  - DOMAIN-SUFFIX,icbc.com.cn,DIRECT
+  - DOMAIN-SUFFIX,icbc.com,DIRECT
+  - DOMAIN-SUFFIX,cmbchina.com,DIRECT
+  - DOMAIN-SUFFIX,cmbchina.com.cn,DIRECT
+  - DOMAIN-SUFFIX,ccb.com,DIRECT
+  - DOMAIN-SUFFIX,ccb.com.cn,DIRECT
+  - DOMAIN-SUFFIX,bocomm.com,DIRECT
+  - DOMAIN-SUFFIX,bankcomm.com,DIRECT
+  - DOMAIN-SUFFIX,psbc.com,DIRECT
+  - DOMAIN-SUFFIX,cmbc.com.cn,DIRECT
+  - DOMAIN-SUFFIX,ceb.com.cn,DIRECT
+  - DOMAIN-SUFFIX,citic.com,DIRECT
+  - DOMAIN-SUFFIX,ecitic.com,DIRECT
+  - DOMAIN-SUFFIX,spdb.com.cn,DIRECT
+  - DOMAIN-SUFFIX,pingan.com,DIRECT
+  - DOMAIN-SUFFIX,pingan.com.cn,DIRECT
+  - DOMAIN-SUFFIX,cmpassport.com,DIRECT
+  - DOMAIN-SUFFIX,jegotrip.com.cn,DIRECT
+  - DOMAIN-SUFFIX,icitymobile.mobi,DIRECT
+  - DOMAIN-SUFFIX,id6.me,DIRECT
+
+  # ---- 私有地址 ----
+  - IP-CIDR,10.0.0.0/8,DIRECT,no-resolve
+  - IP-CIDR,100.64.0.0/10,DIRECT,no-resolve
+  - IP-CIDR,127.0.0.0/8,DIRECT,no-resolve
+  - IP-CIDR,169.254.0.0/16,DIRECT,no-resolve
+  - IP-CIDR,172.16.0.0/12,DIRECT,no-resolve
+  - IP-CIDR,192.168.0.0/16,DIRECT,no-resolve
+  - IP-CIDR,224.0.0.0/4,DIRECT,no-resolve
+  - IP-CIDR,255.255.255.255/32,DIRECT,no-resolve
+  - IP-CIDR6,fe80::/10,DIRECT,no-resolve
+  - IP-CIDR6,fc00::/7,DIRECT,no-resolve
+  # Apple 大段与腾讯 DNS 地址直连
+  - IP-CIDR,17.0.0.0/8,DIRECT,no-resolve
+  - IP-CIDR,182.254.116.0/24,DIRECT,no-resolve
+
+  # ---- AI（必须先于 Google / 媒体） ----
+  - RULE-SET,ai-openai,AI-OpenAI
+  - RULE-SET,ai-anthropic,AI-Claude
+  - RULE-SET,ai-gemini,AI-Gemini
+  - RULE-SET,ai-xai,AI-Grok
+
+  # ---- 具体服务 ----
+  - RULE-SET,youtube,YouTube
+  - RULE-SET,netflix,Netflix
+  - RULE-SET,spotify,Spotify
+  - RULE-SET,telegram,Telegram
+  - RULE-SET,x,X
+  - RULE-SET,paypal,PayPal
+  - RULE-SET,steamcn,DIRECT
+  - RULE-SET,steam,Steam
+  - RULE-SET,game,Game
+  - RULE-SET,google,Google
+  - RULE-SET,onedrive,DIRECT
+  - RULE-SET,microsoft,Microsoft
+  - RULE-SET,binance,Crypto
+  - RULE-SET,okx,Crypto
+  - RULE-SET,crypto,Crypto
+  - RULE-SET,apple,Apple
+  - RULE-SET,wechat,CN
+  - RULE-SET,bilibili,CN
+  - RULE-SET,china,CN
+  - RULE-SET,globalmedia,Media
+
+  # ---- 国内 IP 兜底（放在所有域名规则之后） ----
+  - GEOIP,CN,CN
+
+  - MATCH,漏网之鱼
+
+# =============================================================================
+# DNS
+#   listen 固定在 127.0.0.1:1053：路由器上由 dnsmasq 转发（CN 域名不进这里），
+#   macOS 上 FlClash 自己用 dns-hijack 接管，二者都不影响系统 DNS。
+# =============================================================================
+dns:
+  enable: true
+  listen: 127.0.0.1:1053
+  ipv6: false
+  enhanced-mode: fake-ip
+  fake-ip-range: 198.18.0.1/16
+  cache-algorithm: arc
+  default-nameserver: [223.5.5.5, 119.29.29.29]
+  nameserver:
+    - https://dns.alidns.com/dns-query
+    - https://doh.pub/dns-query
+  proxy-server-nameserver:
+    - https://dns.alidns.com/dns-query
+    - https://doh.pub/dns-query
+
+  # 国内 CDN / 大厂域名用就近 DNS（沿用 QuantumultX.conf 的策略）
+  nameserver-policy:
+    '+.taobao.com': 223.5.5.5
+    '+.tmall.com': 223.5.5.5
+    '+.alipay.com': 223.5.5.5
+    '+.alicdn.com': 223.5.5.5
+    '+.aliyun.com': 223.5.5.5
+    '+.jd.com': 119.28.28.28
+    '+.qq.com': 119.28.28.28
+    '+.tencent.com': 119.29.29.29
+    '+.bilibili.com': 119.29.29.29
+    '+.hdslb.com': 119.29.29.29
+    '+.163.com': 119.29.29.29
+    '+.126.com': 119.29.29.29
+    '+.126.net': 119.29.29.29
+    '+.127.net': 119.29.29.29
+    '+.netease.com': 119.29.29.29
+    '+.mi.com': 119.29.29.29
+    '+.xiaomi.com': 119.29.29.29
+    '+.icloud.com': 119.29.29.29
+    '+.icloud.com.cn': 119.29.29.29
+    '+.weixin.com': 119.29.29.29
+
+  # 这些域名不做 fake-IP 映射：银行/运营商类 App 会检测 198.18.x
+  fake-ip-filter:
+    - '+.cmpassport.com'
+    - '+.jegotrip.com.cn'
+    - '+.icitymobile.mobi'
+    - '+.pingan.com.cn'
+    - '+.pingan.com'
+    - '+.cmbchina.com'
+    - '+.cmbchina.com.cn'
+    - '+.icbc.com.cn'
+    - '+.icbc.com'
+    - '+.95599.cn'
+    - '+.abchina.com.cn'
+    - '+.bscabank.com'
+    - '+.openaboc.cn'
+    - '+.openaboc.com'
+    - '+.openaboc.com.cn'
+    - '+.ccb.com'
+    - '+.ccb.com.cn'
+    - '+.bocomm.com'
+    - '+.bankcomm.com'
+    - '+.psbc.com'
+    - '+.cmbc.com.cn'
+    - '+.ceb.com.cn'
+    - '+.citic.com'
+    - '+.ecitic.com'
+    - '+.spdb.com.cn'
+    - '+.id6.me'
+    - '+.lan'
+    - '+.local'
+    - '+.home.arpa'
+    - '+.localnetwork.uop'
+    - 'captive.apple.com'
+    - '+.ntp.org'
+
+# =============================================================================
+# 流量嗅探：让"只有 IP 没有域名"的连接也能命中域名规则
+# =============================================================================
+sniffer:
+  enable: true
+  force-dns-mapping: true
+  parse-pure-ip: true
+  override-destination: false
+  sniff:
+    HTTP:
+      ports: [80, 8080-8880]
+      override-destination: true
+    TLS:
+      ports: [443, 8443]
+    QUIC:
+      ports: [443, 8443]
