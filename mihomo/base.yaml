@@ -49,7 +49,7 @@ proxy-providers:
 proxy-groups:
   - name: 节点选择
     type: select
-    proxies: [自动选择, SG, JP, US, US固定, TW, DIRECT]
+    proxies: [自动选择, SG, JP, US, US手选, TW, DIRECT]
 
   - name: 自动选择
     type: url-test
@@ -101,73 +101,57 @@ proxy-groups:
     tolerance: 150
     lazy: true
 
-  # AI 固定出口：默认锁定一个"三网推荐"的美国节点，IP 稳定优先于延迟
-  - name: US固定
-    type: select
-    use: [airport]
-    filter: "(?i)(美国|美國|🇺🇸)"
-    exclude-filter: "(?i)(0\\.01倍|下载|剩余|到期|重置|套餐|流量|客户端)"
-    default-selected: '🇺🇸美国圣何塞01-0.1倍'
-
   - name: US手选
     type: select
     use: [airport]
     filter: "(?i)(美国|美國|🇺🇸)"
     exclude-filter: "(?i)(剩余|到期|重置|套餐|流量|客户端)"
+    default-selected: '🇺🇸美国圣何塞01-0.1倍'
 
-  # ---- AI：按厂商分组，先于 Google / 媒体规则命中 ----
-  - name: AI-OpenAI          # ChatGPT / Codex / API
+  # ---- AI：OpenAI / Claude / Gemini / Grok 共用，默认美国手选 ----
+  - name: AI
     type: select
-    proxies: [US固定, US手选, US, 自动选择]
-  - name: AI-Claude          # Claude / Claude Code / MCP
-    type: select
-    proxies: [US固定, US手选, US, 自动选择]
-  - name: AI-Gemini          # Gemini / AI Studio / NotebookLM
-    type: select
-    proxies: [US固定, US手选, US, 自动选择]
-  - name: AI-Grok            # Grok / xAI
-    type: select
-    proxies: [US固定, US手选, US, 自动选择]
+    proxies: [US手选, SG, JP, US, 自动选择, 节点选择]
 
   - name: Google
     type: select
-    proxies: [SG, JP, US, 自动选择, DIRECT]
+    proxies: [SG, JP, US, 自动选择, 节点选择, DIRECT]
   - name: YouTube
     type: select
-    proxies: [SG, US, JP, 自动选择]
+    proxies: [SG, US, JP, 自动选择, 节点选择]
   - name: Netflix
     type: select
-    proxies: [SG, JP, US, 自动选择]
+    proxies: [SG, JP, US, 自动选择, 节点选择]
   - name: Spotify
     type: select
-    proxies: [SG, US, JP, 自动选择]
+    proxies: [SG, US, JP, 自动选择, 节点选择]
   - name: Telegram
     type: select
-    proxies: [SG, JP, US, 自动选择]
+    proxies: [SG, JP, US, 自动选择, 节点选择]
   - name: X
     type: select
-    proxies: [US, SG, JP, 自动选择]
+    proxies: [US, SG, JP, 自动选择, 节点选择]
   - name: PayPal
     type: select
-    proxies: [US, 自动选择, DIRECT]
+    proxies: [US, SG, JP, 自动选择, 节点选择, DIRECT]
   - name: Microsoft
     type: select
-    proxies: [SG, JP, US, 自动选择]
+    proxies: [SG, JP, US, 自动选择, 节点选择]
   - name: Apple
     type: select
-    proxies: [DIRECT, 自动选择, 节点选择]
+    proxies: [DIRECT, SG, JP, US, 自动选择, 节点选择]
   - name: Steam
     type: select
-    proxies: [SG, JP, US, 自动选择, DIRECT]
+    proxies: [SG, JP, US, 自动选择, 节点选择, DIRECT]
   - name: Crypto
     type: select
-    proxies: [US, SG, JP, 自动选择, DIRECT]
+    proxies: [US, SG, JP, 自动选择, 节点选择, DIRECT]
   - name: Media
     type: select
-    proxies: [SG, JP, US, 自动选择, DIRECT]
+    proxies: [SG, JP, US, 自动选择, 节点选择, DIRECT]
   - name: Game
     type: select
-    proxies: [DIRECT, SG, JP, US, 自动选择]
+    proxies: [DIRECT, SG, JP, US, 自动选择, 节点选择]
   - name: CN
     type: select
     proxies: [DIRECT, 节点选择]
@@ -335,10 +319,10 @@ rules:
   - IP-CIDR,182.254.116.0/24,DIRECT,no-resolve
 
   # ---- AI（必须先于 Google / 媒体） ----
-  - RULE-SET,ai-openai,AI-OpenAI
-  - RULE-SET,ai-anthropic,AI-Claude
-  - RULE-SET,ai-gemini,AI-Gemini
-  - RULE-SET,ai-xai,AI-Grok
+  - RULE-SET,ai-openai,AI
+  - RULE-SET,ai-anthropic,AI
+  - RULE-SET,ai-gemini,AI
+  - RULE-SET,ai-xai,AI
 
   # ---- 具体服务 ----
   - RULE-SET,youtube,YouTube

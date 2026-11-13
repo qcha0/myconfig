@@ -150,11 +150,11 @@ OpenWrt < 24.10 / firewall3 可以用 OpenClash 导入同一份 `mihomo/router.y
 
 注意：blackmatrix7 的 Clash 目录把“域名 + IP”拆开了；带 IP 段的列表（China、Apple、Netflix、GlobalMedia）必须使用 `*_Classical_No_Resolve.yaml`，否则只剩域名部分。仓库里已经按此处理。
 
-### 策略组（28 个）
+### 策略组（24 个）
 
-- 区域：`SG` / `JP` / `US` / `TW`（url-test，tolerance 150 避免播放中途切节点），`US手选`，`US固定`
-- `AI-OpenAI` / `AI-Claude` / `AI-Gemini` / `AI-Grok`：默认 `US固定`，固定单节点保持出口 IP 稳定
-- 服务：Google、YouTube、Netflix、Spotify、Telegram、X、PayPal、Microsoft、Apple、Steam、Crypto、Media、Game
+- 区域：`SG` / `JP` / `US` / `TW`（url-test，tolerance 150 避免播放中途切节点），`US手选`
+- `AI`：OpenAI / Claude / Gemini / Grok 共用，默认 `US手选`（手动指定美国节点，保持出口 IP 稳定）
+- 服务：Google、YouTube、Netflix、Spotify、Telegram、X、PayPal、Microsoft、Apple、Steam、Crypto、Media、Game（每组都可选 SG / JP / US / 自动选择 / 节点选择，部分带 DIRECT）
 - `CN`（默认 DIRECT）、`广告`、`漏网之鱼`
 
 ### 关键行为
@@ -201,7 +201,7 @@ git ls-files | grep -E 'router\.yaml|macos\.yaml|subscription\.url|local\.conf' 
 | 代理不生效 | 关闭 flow offloading；确认 nikki TCP 模式为 TPROXY |
 | 游戏丢包 | 确认 nikki UDP 代理已关闭；`NETWORK,udp,DIRECT` 仍在规则里 |
 | YouTube / Spotify 卡顿 | 先确认 QUIC 已被 REJECT；再把对应策略组切到 SG（JP 节点实测最差）；带宽不足时手动选「高速专线-hy2」或美国下载节点 |
-| AI 服务 403 | 链路已通，节点 IP 被风控；在 `US固定` 里换节点 |
+| AI 服务 403 | 链路已通，节点 IP 被风控；在 `US手选` 里换节点 |
 | 想代理 UDP | 删除 `NETWORK,udp,DIRECT`，并在 nikki 打开 UDP 代理 |
 
 ## 依赖
