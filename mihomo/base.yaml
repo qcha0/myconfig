@@ -436,12 +436,15 @@ sniffer:
   enable: true
   force-dns-mapping: true
   parse-pure-ip: true
-  override-destination: false
+  # 用嗅探到的域名替换原始目标地址：DNS 被污染/解析错误时仍能按域名分流并正确连接
+  override-destination: true
   sniff:
     HTTP:
       ports: [80, 8080-8880]
       override-destination: true
     TLS:
       ports: [443, 8443]
+      override-destination: true
     QUIC:
       ports: [443, 8443]
+      override-destination: true

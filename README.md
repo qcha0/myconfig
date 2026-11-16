@@ -163,6 +163,7 @@ OpenWrt < 24.10 / firewall3 可以用 OpenClash 导入同一份 `mihomo/router.y
 - 要代理 UDP（Discord 语音、国际服游戏）：删掉上面两行，并在 nikki 打开 UDP 代理
 - `Game` 组默认 `DIRECT`：游戏流量不经机场；需要加速时手动切 SG/JP
 - DNS：fake-IP + 银行/局域网域名排除（`fake-ip-filter`），国内 CDN 走就近 DNS（`nameserver-policy`）
+- 流量嗅探：HTTP/TLS/QUIC 均开启 `override-destination`，即使系统 DNS 返回错误 IP，也会用嗅探到的域名重新分流并连接（ECH 加密 SNI 的场景除外）
 - 路由器 `log-level: silent`：核心不写连接日志，节省磁盘
 
 ### 更新配置
@@ -200,6 +201,7 @@ git ls-files | grep -E 'router\.yaml|macos\.yaml|subscription\.url|local\.conf' 
 | 路由器上 CN 域名解析异常 | 检查 `install-china-list.sh` 是否执行、`confdir` 是否为 `/etc/dnsmasq.d` |
 | 代理不生效 | 关闭 flow offloading；确认 nikki TCP 模式为 TPROXY |
 | 游戏丢包 | 确认 nikki UDP 代理已关闭；`NETWORK,udp,DIRECT` 仍在规则里 |
+| 浏览器打不开 Google，但 `curl -I google.com` 有 301 | 系统 DNS 被 VPN/SASE 污染（`www.google.com` 可能解析到 31.13.x.x）；先修 DNS，或确认 sniffer 的 `override-destination` 已生效 |
 | YouTube / Spotify 卡顿 | 先确认 QUIC 已被 REJECT；再把对应策略组切到 SG（JP 节点实测最差）；带宽不足时手动选「高速专线-hy2」或美国下载节点 |
 | AI 服务 403 | 链路已通，节点 IP 被风控；在 `US手选` 里换节点 |
 | 想代理 UDP | 删除 `NETWORK,udp,DIRECT`，并在 nikki 打开 UDP 代理 |
